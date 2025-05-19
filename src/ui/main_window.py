@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem,
                             QComboBox, QFormLayout, QTabWidget, QMessageBox,
                             QGroupBox, QProgressBar, QCheckBox, QStyle, QLineEdit,
-                            QToolButton, QHeaderView)
+                            QToolButton, QHeaderView, QTextEdit, QSplitter)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QFont
 
@@ -25,12 +25,13 @@ class PDFtoExcelApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PDFStructure2Excel")
-        self.setMinimumSize(1024, 768)
+        self.setMinimumSize(1200, 800)
         self._set_stylesheet()
         
         # Daten
         self.pdf_path = None
         self.structured_data = None
+        self.extracted_text = None
         
         # Setup UI
         self._setup_ui()
@@ -99,6 +100,14 @@ class PDFtoExcelApp(QMainWindow):
             QToolButton:hover {
                 background-color: #e0e0e0;
             }
+            QTextEdit {
+                font-family: Consolas, monospace;
+                font-size: 12px;
+                line-height: 1.5;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                padding: 5px;
+            }
         """)
     
     def _setup_ui(self):
@@ -139,7 +148,8 @@ class PDFtoExcelApp(QMainWindow):
         
         # Hinweis zum Strukturmuster
         structure_hint = QLabel(
-            "Das Programm erkennt die Struktur basierend auf dem Muster: <b>Level Symbol Type Title_de Text_de</b>.<br>"
+            "Das Programm extrahiert zuerst den Text aus dem PDF und erkennt dann die Struktur "
+            "basierend auf dem Muster: <b>Level Symbol Type Title_de Text_de</b>.<br>"
             "Beispiel: '1 A Einleitung: Qualitätsrichtlinien' wird als Level=1, Symbol=A, Type=CHAPTER, "
             "Title_de=Einleitung, Text_de=Qualitätsrichtlinien erkannt."
         )
@@ -177,12 +187,34 @@ class PDFtoExcelApp(QMainWindow):
         import_layout.addWidget(convert_btn)
         import_layout.addStretch()
         
-        # Tab 2: Ergebnis-Ansicht
-        result_tab = QWidget()
-        result_layout = QVBoxLayout(result_tab)
+        # Tab 2: Konvertierungsergebnisse
+        convert_tab = QWidget()
+        convert_layout = QVBoxLayout(convert_tab)
+        
+        # Splitter zum Teilen des Tabs in Text und Strukturerkennung
+        splitter = QSplitter(Qt.Vertical)
+        
+        # Bereich 1: Extrahierter Text
+        text_widget = QWidget()
+        text_layout = QVBoxLayout(text_widget)
+        
+        text_label = QLabel("<b>SCHRITT 1: Extrahierter Text aus dem PDF</b>")
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlaceholderText("Der extrahierte Text aus dem PDF wird hier angezeigt.")
+        
+        text_layout.addWidget(text_label)
+        text_layout.addWidget(self.text_edit)
+        
+        # Bereich 2: Erkannte Struktur
+        structure_widget = QWidget()
+        structure_layout = QVBoxLayout(structure_widget)
         
         # Erklärung der Strukturelemente
-        structure_info = QGroupBox("Strukturelement-Erklärung")
+        structure_label = QLabel("<b>SCHRITT 2: Erkannte Struktur (Level Symbol Type Title_de Text_de)</b>")
+        
+        # Strukturinformation
+        structure_info = QGroupBox("Bedeutung der Spalten")
         structure_info_layout = QVBoxLayout(structure_info)
         
         structure_info_text = QLabel(
@@ -196,8 +228,6 @@ class PDFtoExcelApp(QMainWindow):
         structure_info_layout.addWidget(structure_info_text)
         
         # Ergebnistabelle
-        result_label = QLabel("Extrahierte Struktur:")
-        result_label.setFont(QFont("", -1, QFont.Bold))
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(5)
         self.result_table.setHorizontalHeaderLabels(["Level", "Symbol", "Type", "Title_de", "Text_de"])
@@ -206,6 +236,15 @@ class PDFtoExcelApp(QMainWindow):
         self.result_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.result_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
         self.result_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        
+        structure_layout.addWidget(structure_label)
+        structure_layout.addWidget(structure_info)
+        structure_layout.addWidget(self.result_table)
+        
+        # Hinzufügen zum Splitter
+        splitter.addWidget(text_widget)
+        splitter.addWidget(structure_widget)
+        splitter.setSizes([300, 500])  # Anfangsgröße
         
         # Exportbereich
         export_group = QGroupBox("Daten exportieren")
@@ -228,10 +267,8 @@ class PDFtoExcelApp(QMainWindow):
         export_layout.addStretch()
         
         # Layout für Tab 2
-        result_layout.addWidget(structure_info)
-        result_layout.addWidget(result_label)
-        result_layout.addWidget(self.result_table)
-        result_layout.addWidget(export_group)
+        convert_layout.addWidget(splitter)
+        convert_layout.addWidget(export_group)
         
         # Tab 3: Erweiterte Einstellungen
         settings_tab = QWidget()
@@ -273,7 +310,7 @@ class PDFtoExcelApp(QMainWindow):
         
         # Tabs hinzufügen
         tabs.addTab(import_tab, "PDF importieren")
-        tabs.addTab(result_tab, "Ergebnisse")
+        tabs.addTab(convert_tab, "Konvertierungsergebnisse")
         tabs.addTab(settings_tab, "Erweiterte Einstellungen")
         
         # Hauptlayout
@@ -281,6 +318,7 @@ class PDFtoExcelApp(QMainWindow):
         main_layout.addWidget(self.progress_bar)
         
         self.setCentralWidget(central_widget)
+        self.tabs = tabs  # Speichere Referenz auf Tabs
     
     def _browse_pdf(self):
         """Öffnet den Datei-Dialog zum Auswählen einer PDF"""
@@ -301,158 +339,137 @@ class PDFtoExcelApp(QMainWindow):
         if not self.pdf_path:
             QMessageBox.warning(self, "Keine Datei", "Bitte wählen Sie zuerst eine PDF-Datei aus.")
             return
-        
-        # Zeige Fortschrittsbalken
+
+        # Fortschrittsbalken anzeigen
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
         
-        # Struktur-Regeln sammeln
-        structure_type = self.structure_combo.currentData()
+        # Struktur-Vorlage auswählen
+        template_type = self.structure_combo.currentData()
         
-        # Benutzerdefinierte Regeln, wenn ausgewählt
-        custom_rules = None
-        if structure_type == "custom":
-            custom_rules = {
-                'level_pattern': self.level_pattern.text(),
-                'symbol_pattern': self.symbol_pattern.text(),
-                'remove_headers': self.remove_headers.isChecked(),
-                'merge_lines': self.merge_lines.isChecked()
-            }
+        # Optionen für die Verarbeitung
+        options = {
+            "remove_headers": self.remove_headers.isChecked(),
+            "merge_lines": self.merge_lines.isChecked(),
+            "level_pattern": self.level_pattern.text(),
+            "symbol_pattern": self.symbol_pattern.text(),
+            "template_type": template_type
+        }
         
-        # Worker-Thread für die Verarbeitung starten
-        self.worker = PDFProcessWorker(self.pdf_path, structure_type, custom_rules)
-        self.worker.progress_signal.connect(self._update_progress)
-        self.worker.result_signal.connect(self._handle_result)
-        self.worker.error_signal.connect(self._handle_error)
+        # PDF-Verarbeitung starten (in einem separaten Thread)
+        self.worker = PDFProcessWorker(self.pdf_path, options)
+        self.worker.progress_signal.connect(self.progress_bar.setValue)
+        self.worker.text_extracted_signal.connect(self._display_extracted_text)
+        self.worker.result_signal.connect(self._display_structure)
+        self.worker.finished.connect(self._on_conversion_finished)
+        self.worker.error_signal.connect(self._on_conversion_error)
         self.worker.start()
+        
+        # Zur Ergebnisansicht wechseln
+        self.tabs.setCurrentIndex(1)
     
-    def _update_progress(self, value):
-        """Aktualisiert den Fortschrittsbalken"""
-        self.progress_bar.setValue(value)
+    def _display_extracted_text(self, text):
+        """Zeigt den extrahierten Text im TextEdit an"""
+        self.extracted_text = text
+        self.text_edit.setText(text)
     
-    def _handle_result(self, result):
-        """Verarbeitet das Ergebnis der PDF-Konvertierung"""
-        self.structured_data = result
-        self._display_result()
-        self.progress_bar.setVisible(False)
-        # Wechsel zum Ergebnis-Tab
-        self.centralWidget().findChild(QTabWidget).setCurrentIndex(1)
+    def _display_structure(self, data):
+        """Zeigt die erkannte Struktur in der Tabelle an"""
+        self.structured_data = data
+        
+        # Tabelle leeren
+        self.result_table.setRowCount(0)
+        
+        # Daten einfüllen
+        for row_idx, row_data in enumerate(data):
+            self.result_table.insertRow(row_idx)
+            for col_idx, value in enumerate(row_data.values()):
+                item = QTableWidgetItem(str(value) if value is not None else "")
+                self.result_table.setItem(row_idx, col_idx, item)
+        
+        # Export-Buttons aktivieren
         self.normal_export_btn.setEnabled(True)
         self.template_export_btn.setEnabled(True)
     
-    def _handle_error(self, error_msg):
-        """Behandelt Fehler bei der Konvertierung"""
+    def _on_conversion_finished(self):
+        """Wird aufgerufen, wenn die Konvertierung abgeschlossen ist"""
         self.progress_bar.setVisible(False)
-        QMessageBox.critical(self, "Fehler", f"Ein Fehler ist aufgetreten: {error_msg}")
+        QMessageBox.information(
+            self, 
+            "Konvertierung abgeschlossen", 
+            "Die PDF wurde erfolgreich konvertiert. Sie können die Daten jetzt exportieren."
+        )
     
-    def _display_result(self):
-        """Zeigt die Ergebnisse in der Tabelle an"""
-        data = self.structured_data
-        self.result_table.setRowCount(len(data))
-        
-        for row, item in enumerate(data):
-            level = str(item.get("Level", ""))
-            symbol = str(item.get("Symbol", ""))
-            type_value = str(item.get("Type", ""))
-            title = str(item.get("Title_de", ""))
-            text = str(item.get("Text_de", ""))
-            
-            # Farbe je nach Typ
-            is_chapter = type_value == "CHAPTER"
-            
-            # Items erstellen
-            level_item = QTableWidgetItem(level)
-            symbol_item = QTableWidgetItem(symbol)
-            type_item = QTableWidgetItem(type_value)
-            title_item = QTableWidgetItem(title)
-            text_item = QTableWidgetItem(text)
-            
-            # Schriftart basierend auf Hierarchie
-            font = QFont()
-            if level == "1":
-                font.setBold(True)
-                font.setPointSize(12)
-            elif level == "2":
-                font.setBold(True)
-            
-            # Schriftart für alle Zellen in der Zeile setzen
-            for item in [level_item, symbol_item, type_item, title_item, text_item]:
-                item.setFont(font)
-                
-                # Hintergrundfarbe für Kapitel
-                if is_chapter:
-                    item.setBackground(Qt.lightGray)
-            
-            # Items einfügen
-            self.result_table.setItem(row, 0, level_item)
-            self.result_table.setItem(row, 1, symbol_item)
-            self.result_table.setItem(row, 2, type_item)
-            self.result_table.setItem(row, 3, title_item)
-            self.result_table.setItem(row, 4, text_item)
-        
-        # Spaltenbreiten anpassen
-        self.result_table.resizeColumnsToContents()
+    def _on_conversion_error(self, error_msg):
+        """Wird bei einem Fehler während der Konvertierung aufgerufen"""
+        self.progress_bar.setVisible(False)
+        QMessageBox.critical(self, "Fehler bei der Konvertierung", error_msg)
     
     def _export_to_excel(self, use_template=False):
-        """Exportiert die Ergebnisse als Excel-Datei"""
+        """Exportiert die Daten in eine Excel-Datei"""
         if not self.structured_data:
+            QMessageBox.warning(self, "Keine Daten", "Es sind keine Daten zum Exportieren vorhanden.")
             return
         
-        # Dialog zum Speichern der Excel-Datei
+        # Excel-Datei speichern
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Excel-Datei speichern", "", "Excel-Dateien (*.xlsx);;Alle Dateien (*.*)"
         )
         
-        if file_path:
-            try:
-                if use_template:
-                    # Verwende den Excel-Template-Generator
-                    create_excel_template(self.structured_data, file_path)
-                else:
-                    # Einfacher Excel-Export
-                    df = pd.DataFrame(self.structured_data)
-                    df.to_excel(file_path, index=False)
-                
-                QMessageBox.information(
-                    self, 
-                    "Erfolg", 
-                    f"Daten wurden erfolgreich nach {file_path} exportiert."
-                )
-            except Exception as e:
-                QMessageBox.critical(self, "Fehler", f"Fehler beim Exportieren: {str(e)}")
+        if not file_path:
+            return
+        
+        if not file_path.endswith(".xlsx"):
+            file_path += ".xlsx"
+        
+        try:
+            # DataFrame aus strukturierten Daten erstellen
+            df = pd.DataFrame(self.structured_data)
+            
+            if use_template:
+                # Mit Formatvorlage exportieren
+                create_excel_template(df, file_path)
+            else:
+                # Standard-Export
+                df.to_excel(file_path, index=False)
+            
+            QMessageBox.information(
+                self, 
+                "Export erfolgreich", 
+                f"Die Daten wurden erfolgreich nach {file_path} exportiert."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler beim Export", f"Fehler beim Exportieren: {str(e)}")
     
     def _show_structure_examples(self):
-        """Zeigt Beispiele für Strukturmuster an"""
-        example_text = """
-<h3>Beispiele für Strukturmuster</h3>
-
-<b>Palliative Care (aktuell ausgewählt):</b>
-<pre>
-1 A Einleitung: Qualitätsrichtlinien für Palliative Care
-2 B1 Definition: Palliative Care ist ein Ansatz...
-3 C2.1 Anforderung: Systematische Erfassung von Symptomen
-</pre>
-
-<b>ISO-Norm:</b>
-<pre>
-1 Anwendungsbereich
-4.1 Verstehen der Organisation: Die Organisation muss...
-5.2 Politik: Die oberste Leitung muss...
-</pre>
-
-<b>Allgemeine Struktur:</b>
-<pre>
-1 TEIL1 Einführung in das Thema
-2 KAP2 Wichtige Grundlagen zum Verständnis
-3 ABS3.1 Unterabschnitt mit Details
-</pre>
-
-<b>Das Strukturmuster enthält 5 Elemente:</b>
-1. <b>Level:</b> Hierarchische Ebene (1, 2, 3, ...)
-2. <b>Symbol:</b> Identifikator (A, B1, C2.1, ...)
-3. <b>Type:</b> Automatisch erkannt (CHAPTER, REQUIREMENT)
-4. <b>Title_de:</b> Titel vor dem Doppelpunkt
-5. <b>Text_de:</b> Text nach dem Doppelpunkt
-"""
+        """Zeigt Beispiele für die verschiedenen Strukturmuster an"""
+        examples = {
+            "palliative_care": (
+                "1 A CHAPTER Qualitätsrichtlinien: Beschreibung der Qualitätsanforderungen für die Palliativversorgung.\n"
+                "2 A1 REQUIREMENT Dokumentation: Alle Maßnahmen müssen vollständig dokumentiert werden.\n"
+                "3 A1.1 CRITERION Checkliste: Die Checkliste muss vollständig ausgefüllt werden."
+            ),
+            "iso_standard": (
+                "1 4 CHAPTER Kontext der Organisation: Die Organisation muss externe und interne Themen bestimmen.\n"
+                "2 4.1 REQUIREMENT Verstehen der Organisation: Die Organisation und ihr Kontext müssen definiert werden.\n"
+                "3 4.1.1 NOTE Hinweis: Externe und interne Themen können positiv oder negativ sein."
+            ),
+            "general": (
+                "1 1 SECTION Einleitung: Dieser Abschnitt enthält grundlegende Informationen.\n"
+                "2 1.1 SUBSECTION Hintergrund: Hier werden die Hintergrundinformationen beschrieben.\n"
+                "3 1.1.1 ITEM Wichtiger Punkt: Dieser Punkt ist besonders hervorzuheben."
+            )
+        }
         
-        QMessageBox.information(self, "Strukturmuster-Beispiele", example_text)
+        current_template = self.structure_combo.currentData()
+        message = f"<h3>Beispiel für die Vorlage \"{self.structure_combo.currentText()}\":</h3>"
+        
+        if current_template in examples:
+            message += f"<pre>{examples[current_template]}</pre>"
+        else:
+            message += (
+                "<p>Für benutzerdefinierte Vorlagen können Sie die Erkennungsmuster "
+                "im Tab \"Erweiterte Einstellungen\" anpassen.</p>"
+            )
+        
+        QMessageBox.information(self, "Strukturbeispiele", message)
