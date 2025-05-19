@@ -1,0 +1,58 @@
+# Beispieltext für ISO-Norm-Struktur
+
+ISO 9001:2025 Qualitätsmanagementsysteme - Anforderungen
+
+1 Anwendungsbereich
+1.1 Allgemein: Diese Norm legt Anforderungen an ein Qualitätsmanagementsystem fest
+
+2 Normative Verweisungen
+2.1 Referenzdokumente: ISO 9000:2025 wird als normative Referenz zitiert
+
+3 Begriffe
+3.1 Organisation: Person oder Personengruppe mit eigenen Funktionen
+3.2 Interessierte Partei: Person oder Organisation mit Interesse
+
+4 Kontext der Organisation
+4.1 Verstehen der Organisation: Die Organisation muss externe und interne Themen bestimmen
+4.2 Verstehen der Erfordernisse: Die Organisation muss die Erfordernisse interessierter Parteien ermitteln
+4.3 Anwendungsbereich: Die Organisation muss die Grenzen des QMS festlegen
+4.4 Qualitätsmanagementsystem: Die Organisation muss ein QMS aufbauen und verbessern
+
+5 Führung
+5.1 Führung und Verpflichtung: Die oberste Leitung muss Führung und Verpflichtung zeigen
+5.1.1 Kundenorientierung: Die oberste Leitung muss Kundenfokus sicherstellen
+5.2 Politik: Die oberste Leitung muss eine Qualitätspolitik festlegen
+5.3 Rollen und Verantwortlichkeiten: Die oberste Leitung muss Verantwortlichkeiten zuweisen
+
+6 Planung
+6.1 Maßnahmen zum Umgang mit Risiken: Die Organisation muss Risiken und Chancen bestimmen
+6.2 Qualitätsziele: Die Organisation muss messbare Ziele festlegen
+6.3 Planung von Änderungen: Änderungen müssen geplant durchgeführt werden
+
+7 Unterstützung
+7.1 Ressourcen: Die Organisation muss notwendige Ressourcen bereitstellen
+7.1.1 Personen: Notwendige Personen müssen bereitgestellt werden
+7.1.2 Infrastruktur: Notwendige Infrastruktur muss bereitgestellt werden
+7.2 Kompetenz: Notwendige Kompetenzen müssen sichergestellt werden
+7.3 Bewusstsein: Personen müssen sich der Qualitätspolitik bewusst sein
+7.4 Kommunikation: Interne und externe Kommunikation muss festgelegt sein
+7.5 Dokumentierte Information: Das QMS muss dokumentierte Information enthalten
+
+8 Betrieb
+8.1 Betriebliche Planung und Steuerung: Prozesse müssen geplant und gesteuert werden
+8.2 Anforderungen an Produkte und Dienstleistungen: Kommunikation mit Kunden muss erfolgen
+8.3 Entwicklung: Entwicklungsprozesse müssen geeignet sein
+8.4 Lenkung externer Prozesse: Externe Prozesse müssen gelenkt werden
+8.5 Produktion und Dienstleistungserbringung: Produktions- und Dienstleistungsprozesse müssen beherrscht werden
+8.6 Freigabe: Produkte und Dienstleistungen müssen verifiziert werden
+8.7 Steuerung nicht konformer Ergebnisse: Nicht konforme Ergebnisse müssen identifiziert werden
+
+9 Bewertung der Leistung
+9.1 Überwachung, Messung, Analyse: Die Organisation muss die Leistung bewerten
+9.2 Internes Audit: Die Organisation muss interne Audits durchführen
+9.3 Managementbewertung: Die oberste Leitung muss das QMS bewerten
+
+10 Verbesserung
+10.1 Allgemeines: Die Organisation muss Verbesserungsmöglichkeiten umsetzen
+10.2 Nichtkonformität und Korrekturmaßnahmen: Bei Nichtkonformitäten muss reagiert werden
+10.3 Fortlaufende Verbesserung: Das QMS muss fortlaufend verbessert werden
