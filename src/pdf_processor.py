@@ -3,6 +3,12 @@
 
 """
 PDF-Verarbeitungsmodul für PDFStructure2Excel
+
+Arbeitsablauf:
+1. Text aus PDF extrahieren
+2. Text bereinigen und vorverarbeiten
+3. Strukturelemente anhand von Kennungen (Level, Symbol, etc.) identifizieren
+4. Extrahierte Daten im Format "Level Symbol Type Title_de Text_de" zurückgeben
 """
 
 import re
@@ -16,6 +22,7 @@ class PDFProcessWorker(QThread):
     progress_signal = pyqtSignal(int)
     result_signal = pyqtSignal(object)
     error_signal = pyqtSignal(str)
+    text_extracted_signal = pyqtSignal(str)  # Neues Signal für extrahierten Text
     
     def __init__(self, pdf_path, structure_type='palliative_care', custom_rules=None):
         """
@@ -32,39 +39,162 @@ class PDFProcessWorker(QThread):
         self.custom_rules = custom_rules
         
     def run(self):
-        """Verarbeitet das PDF und extrahiert strukturierte Daten"""
+        """
+        Verarbeitet das PDF und extrahiert strukturierte Daten
+        
+        Schritte:
+        1. Text aus PDF extrahieren
+        2. Text bereinigen (Header entfernen, Zeilen zusammenführen)
+        3. Struktur anhand von Kennungen erkennen
+        4. Daten im Format "Level Symbol Type Title_de Text_de" zurückgeben
+        """
         try:
-            # Hole die Regeln für den ausgewählten Strukturtyp
+            # SCHRITT 1: Lade Strukturregeln
+            self.progress_signal.emit(1)
             if self.structure_type == 'custom' and self.custom_rules:
                 rules = self.custom_rules
             else:
                 rules = get_structure_rules(self.structure_type)
-                
-            # Öffne das PDF und extrahiere Text
-            with open(self.pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                total_pages = len(pdf_reader.pages)
-                text = ""
-                for i, page in enumerate(pdf_reader.pages):
-                    text += page.extract_text() + "\n"
-                    self.progress_signal.emit(int((i + 1) / total_pages * 50))
             
-            # Vorverarbeitung
-            if rules.get('remove_headers', True):
-                text = self._remove_headers(text)
-                
-            if rules.get('merge_lines', True):
-                text = self._merge_related_lines(text, rules)
+            # SCHRITT 2: Extrahiere Text aus dem PDF
+            self.progress_signal.emit(5)
+            extracted_text = self._extract_text_from_pdf()
+            self.text_extracted_signal.emit(extracted_text)  # Signal mit extrahiertem Text
             
-            # Extrahiere strukturierte Daten
-            data = self._extract_structure(text, rules)
-            self.result_signal.emit(data)
+            # SCHRITT 3: Bereinige den Text
+            self.progress_signal.emit(40)
+            clean_text = self._preprocess_text(extracted_text, rules)
+            
+            # SCHRITT 4: Erkenne die Struktur anhand der Kennungen (Level, Symbol, etc.)
+            self.progress_signal.emit(50)
+            structured_data = self._identify_structure_elements(clean_text, rules)
+            
+            # SCHRITT 5: Sende das Ergebnis
+            self.progress_signal.emit(95)
+            self.result_signal.emit(structured_data)
+            self.progress_signal.emit(100)
             
         except Exception as e:
             self.error_signal.emit(str(e))
     
+    def _extract_text_from_pdf(self):
+        """
+        Schritt 1: Extrahiert den reinen Text aus der PDF-Datei
+        
+        Returns:
+            str: Extrahierter Text aus dem PDF
+        """
+        with open(self.pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            total_pages = len(pdf_reader.pages)
+            text = ""
+            
+            for i, page in enumerate(pdf_reader.pages):
+                page_text = page.extract_text()
+                text += page_text + "\n"
+                progress = int(5 + (i + 1) / total_pages * 35)  # 5% bis 40% Fortschritt
+                self.progress_signal.emit(progress)
+        
+        return text
+    
+    def _preprocess_text(self, text, rules):
+        """
+        Schritt 2: Bereinigt den Text für die Strukturerkennung
+        
+        Args:
+            text (str): Extrahierter Text aus dem PDF
+            rules (dict): Strukturregeln
+            
+        Returns:
+            str: Bereinigter Text
+        """
+        # A) Entferne Kopf- und Fußzeilen, falls gewünscht
+        if rules.get('remove_headers', True):
+            text = self._remove_headers(text)
+            
+        # B) Führe zusammengehörige Zeilen zusammen, falls gewünscht
+        if rules.get('merge_lines', True):
+            text = self._merge_related_lines(text, rules)
+        
+        return text
+    
+    def _identify_structure_elements(self, text, rules):
+        """
+        Schritt 3: Identifiziert Strukturelemente anhand der Kennungen
+        
+        Args:
+            text (str): Bereinigter Text
+            rules (dict): Strukturregeln
+            
+        Returns:
+            list: Liste von Dictionaries im Format "Level Symbol Type Title_de Text_de"
+        """
+        result = []
+        lines = text.split('\n')
+        total_lines = max(1, len(lines))
+        
+        for i, line in enumerate(lines):
+            if not line.strip():
+                continue
+            
+            # Fortschritt aktualisieren: 50% bis 95%
+            progress = 50 + int((i + 1) / total_lines * 45)
+            self.progress_signal.emit(progress)
+            
+            # Spezialfall: qualité palliative
+            if "qualité palliative" in line:
+                result.append({
+                    "Level": "1",
+                    "Symbol": "Q",
+                    "Type": "CHAPTER",
+                    "Title_de": "qualité palliative SLZP:25",
+                    "Text_de": "Auditkriterien stationäre Langzeitpflege mit allgemeiner Palliative Care"
+                })
+                continue
+            
+            # Hole die Muster für Level- und Symbol-Erkennung aus den Regeln
+            level_pattern = rules.get('level_pattern', r'^\s*(\d+)')
+            symbol_pattern = rules.get('symbol_pattern', r'^\s*(?:\d+\s+)?([A-Z](?:\d+(?:\.\d+)*)?)')
+            
+            # A) Suche nach Level-Kennung
+            level_match = re.search(level_pattern, line)
+            
+            # B) Suche nach Symbol-Kennung
+            symbol_match = re.search(symbol_pattern, line)
+            
+            if level_match and symbol_match:
+                # Level und Symbol gefunden - extrahiere die Werte
+                level = level_match.group(1)
+                symbol = symbol_match.group(1)
+                
+                # C) Bestimme den Typ basierend auf Level und Symbol
+                type_value = self._determine_type(symbol, level, rules)
+                
+                # D) Extrahiere Titel und Text aus dem Rest der Zeile
+                rest_of_line = line[max(level_match.end(), symbol_match.end()):].strip()
+                title, text = self._extract_title_and_text(rest_of_line, rules)
+                
+                # E) Füge das strukturierte Element dem Ergebnis hinzu
+                result.append({
+                    "Level": level,
+                    "Symbol": symbol,
+                    "Type": type_value,
+                    "Title_de": title,
+                    "Text_de": text
+                })
+        
+        return result
+    
     def _remove_headers(self, text):
-        """Entfernt Kopf- und Fußzeilen aus dem Text"""
+        """
+        Entfernt Kopf- und Fußzeilen aus dem Text
+        
+        Args:
+            text (str): Extrahierter Text
+            
+        Returns:
+            str: Text ohne Kopf- und Fußzeilen
+        """
         lines = text.split('\n')
         filtered_lines = []
         
@@ -117,68 +247,6 @@ class PDFProcessWorker(QThread):
             result.append(current_line)
             
         return '\n'.join(result)
-    
-    def _extract_structure(self, text, rules):
-        """
-        Extrahiert strukturierte Daten aus dem Text basierend auf den Regeln
-        
-        Args:
-            text (str): Zu analysierender Text
-            rules (dict): Strukturregeln
-            
-        Returns:
-            list: Liste von Dictionaries mit den strukturierten Daten (Level, Symbol, Type, Title_de, Text_de)
-        """
-        result = []
-        lines = text.split('\n')
-        
-        # Fortschritt initialisieren
-        total_lines = max(1, len(lines))
-        
-        for i, line in enumerate(lines):
-            if not line.strip():
-                continue
-                
-            # Fortschritt aktualisieren
-            self.progress_signal.emit(50 + int((i + 1) / total_lines * 50))
-            
-            # Spezielle Behandlung für die erste Zeile mit "qualité palliative"
-            if "qualité palliative" in line:
-                result.append({
-                    "Level": "1",
-                    "Symbol": "Q",  # Besser erkennbares Symbol
-                    "Type": "CHAPTER",
-                    "Title_de": "qualité palliative SLZP:25",
-                    "Text_de": "Auditkriterien stationäre Langzeitpflege mit allgemeiner Palliative Care"
-                })
-                continue
-            
-            # Reguläre Strukturextraktion
-            level_pattern = rules.get('level_pattern', r'^\s*(\d+)')
-            symbol_pattern = rules.get('symbol_pattern', r'^\s*(?:\d+\s+)?([A-Z](?:\d+(?:\.\d+)*)?)')
-            
-            level_match = re.search(level_pattern, line)
-            symbol_match = re.search(symbol_pattern, line)
-            
-            if level_match and symbol_match:
-                # Extrahiere Symbol und bestimme den Typ
-                level = level_match.group(1)
-                symbol = symbol_match.group(1)
-                type_value = self._determine_type(symbol, level, rules)
-                
-                # Extrahiere Titel und Text
-                rest_of_line = line[max(level_match.end(), symbol_match.end()):].strip()
-                title, text = self._extract_title_and_text(rest_of_line, rules)
-                
-                result.append({
-                    "Level": level,
-                    "Symbol": symbol,
-                    "Type": type_value,
-                    "Title_de": title,
-                    "Text_de": text
-                })
-        
-        return result
     
     def _determine_type(self, symbol, level, rules):
         """
