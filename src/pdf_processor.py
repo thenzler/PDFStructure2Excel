@@ -22,21 +22,36 @@ class PDFProcessWorker(QThread):
     progress_signal = pyqtSignal(int)
     result_signal = pyqtSignal(object)
     error_signal = pyqtSignal(str)
-    text_extracted_signal = pyqtSignal(str)  # Neues Signal für extrahierten Text
+    text_extracted_signal = pyqtSignal(str)  # Signal für extrahierten Text
     
-    def __init__(self, pdf_path, structure_type='palliative_care', custom_rules=None):
+    def __init__(self, pdf_path, options=None):
         """
         Initialisiert den Worker
         
         Args:
             pdf_path (str): Pfad zur PDF-Datei
-            structure_type (str): Typ der Dokumentstruktur
-            custom_rules (dict, optional): Benutzerdefinierte Regeln
+            options (dict): Optionen für die Verarbeitung, enthält:
+                - template_type: Typ der Dokumentstruktur
+                - remove_headers: Kopf- und Fußzeilen entfernen
+                - merge_lines: Zeilen zusammenführen
+                - level_pattern: Muster für Level-Erkennung
+                - symbol_pattern: Muster für Symbol-Erkennung
         """
         super().__init__()
         self.pdf_path = pdf_path
-        self.structure_type = structure_type
-        self.custom_rules = custom_rules
+        
+        self.options = options or {}
+        self.structure_type = self.options.get('template_type', 'palliative_care')
+        self.custom_rules = None
+        
+        # Wenn benutzerdefinierte Vorlagen verwendet werden
+        if self.structure_type == 'custom':
+            self.custom_rules = {
+                'level_pattern': self.options.get('level_pattern'),
+                'symbol_pattern': self.options.get('symbol_pattern'),
+                'remove_headers': self.options.get('remove_headers', True),
+                'merge_lines': self.options.get('merge_lines', True)
+            }
         
     def run(self):
         """
