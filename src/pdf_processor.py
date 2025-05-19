@@ -199,62 +199,50 @@ class PDFProcessWorker(QThread):
         if len(symbol) == 1 and symbol.isalpha():  # Einzelner Buchstabe (A, B, C)
             return type_mapping.get('single_letter', 'CHAPTER')
             
-        if re.match(r'^[A-Z]\d+$', symbol):  # Buchstabe + Zahl (A1, B2)
+        if re.match(r'^[A-Z]\d+$', symbol):  # Buchstabe gefolgt von Zahl(en) (A1, B2)
             return type_mapping.get('letter_number', 'CHAPTER')
             
-        if re.match(r'^[A-Z]\d+\.\d+$', symbol):  # Buchstabe + Zahl + Punkt + Zahl (A1.1, B2.3)
+        if re.match(r'^[A-Z]\d+\.\d+$', symbol):  # Buchstabe, Zahl, Punkt, Zahl (A1.1, B2.3)
             return type_mapping.get('letter_number_dot_number', 'REQUIREMENT')
             
-        if symbol.isdigit():  # Reine Zahl (1, 2, 3)
+        if re.match(r'^\d+$', symbol):  # Nur eine Zahl (1, 2, 3)
             return type_mapping.get('single_number', 'CHAPTER')
             
-        if re.match(r'^\d+\.\d+$', symbol):  # Zahl + Punkt + Zahl (1.1, 2.3)
+        if re.match(r'^\d+\.\d+$', symbol):  # Zahl, Punkt, Zahl (1.1, 2.3)
             return type_mapping.get('number_dot_number', 'REQUIREMENT')
-        
-        # Basierend auf Level entscheiden
-        if int(level) <= 2:  # Annahme: Niedriges Level = Kapitel
-            return 'CHAPTER'
-        else:
-            return 'REQUIREMENT'
+            
+        # Entscheidung basierend auf Level
+        if level == "1" or level == "2":
+            return "CHAPTER"
+            
+        # Fallback für alle anderen Fälle
+        return "REQUIREMENT"
     
     def _extract_title_and_text(self, content, rules):
         """
-        Extrahiert Titel und Text aus dem Inhalt
+        Extrahiert Titel und Text aus dem Inhalt basierend auf den Regeln
         
         Args:
-            content (str): Inhalt nach Entfernung von Level und Symbol
+            content (str): Zu analysierender Inhalt
             rules (dict): Strukturregeln
             
         Returns:
-            tuple: (title, text) Titel und Text des Elements
+            tuple: (Titel, Text)
         """
-        # Verwende Muster aus den Regeln, falls vorhanden
-        title_pattern = rules.get('title_pattern')
-        text_pattern = rules.get('text_pattern')
-        
-        # Verwende Doppelpunkt als Standardtrenner
+        # Primäre Methode: Trennung durch Doppelpunkt
         if ":" in content:
             parts = content.split(":", 1)
             return parts[0].strip(), parts[1].strip()
         
-        # Versuche, die Muster anzuwenden, falls vorhanden
-        if title_pattern and text_pattern:
-            title_match = re.search(title_pattern, content)
-            text_match = re.search(text_pattern, content)
-            
-            if title_match and text_match:
-                return title_match.group(1).strip(), text_match.group(1).strip()
-        
-        # Fallback: Heuristik basierend auf Wortanzahl
+        # Sekundäre Methode: Manuelle Trennung
+        title_words = rules.get('title_words', 5)  # Standardwert: 5 Wörter für Titel
         words = content.split()
         
-        # Wenn wenige Wörter, wahrscheinlich ein Titel ohne Text
-        if len(words) <= 5:
+        if len(words) <= title_words:
             return content, ""
         
-        # Andernfalls: Ersten paar Wörter als Titel, Rest als Text
-        title_word_count = min(5, len(words) // 3 + 2)  # Dynamisch basierend auf Gesamtwortanzahl
-        title = " ".join(words[:title_word_count])
-        text = " ".join(words[title_word_count:])
+        # Verwende die ersten X Wörter als Titel
+        title = " ".join(words[:title_words])
+        text = " ".join(words[title_words:])
         
         return title, text
