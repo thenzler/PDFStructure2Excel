@@ -1,0 +1,24 @@
+# Beispieltext für Palliative Care Auditkriterien
+
+qualité palliative SLZP:25 Auditkriterien stationäre Langzeitpflege mit allgemeiner Palliative Care
+
+1 A Einleitung: Qualitätsrichtlinien für Palliative Care
+
+2 B Rahmenbedingungen: Grundlagen der Palliative Care in der Langzeitpflege
+2 B1 Definition: Palliative Care ist ein Ansatz zur Verbesserung der Lebensqualität von Patient*innen und ihren Familien
+2 B2 Schwerpunkte: Fokus auf Symptomlinderung und Lebensqualität
+
+3 C Auditkriterien
+3 C1 Strukturqualität: Organisatorische Rahmenbedingungen
+3 C1.1 Konzept: Ein Palliative Care Konzept liegt vor
+3 C1.2 Ressourcen: Personelle und materielle Ressourcen sind definiert
+3 C2 Prozessqualität: Ablauf der Betreuung und Begleitung
+3 C2.1 Symptomerfassung: Systematische Erfassung von Schmerzen und anderen Symptomen
+3 C2.2 Therapieplanung: Interdisziplinäre Therapieplanung mit Patient*innen und Angehörigen
+3 C3 Ergebnisqualität: Verbesserung der Lebensqualität
+3 C3.1 Evaluation: Regelmäßige Überprüfung der Maßnahmen
+3 C3.2 Feedback: Erfassung der Zufriedenheit
+
+4 D Umsetzung
+4 D1 Schulung: Regelmäßige Fortbildung des Personals
+4 D2 Netzwerk: Zusammenarbeit mit externen Diensten
