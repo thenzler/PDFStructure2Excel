@@ -1,0 +1,27 @@
+
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hintergrund -->
+  <rect width="128" height="128" rx="12" fill="#f0f0f0" />
+  
+  <!-- PDF-Symbol (rot) -->
+  <rect x="18" y="22" width="50" height="65" rx="4" fill="#e74c3c" />
+  <text x="31" y="56" font-family="Arial" font-size="20" font-weight="bold" fill="white">PDF</text>
+  <path d="M58 22 L68 32 L58 32 Z" fill="#c0392b" />
+  <path d="M58 22 L68 32 L68 87 L18 87 L18 22 Z" fill="none" stroke="#c0392b" stroke-width="2" />
+  
+  <!-- Excel-Symbol (grün) -->
+  <rect x="58" y="42" width="50" height="65" rx="4" fill="#27ae60" />
+  <text x="63" y="77" font-family="Arial" font-size="17" font-weight="bold" fill="white">XLSX</text>
+  <path d="M98 42 L108 52 L98 52 Z" fill="#219653" />
+  <path d="M98 42 L108 52 L108 107 L58 107 L58 42 Z" fill="none" stroke="#219653" stroke-width="2" />
+  
+  <!-- Pfeile zwischen den Dokumenten -->
+  <path d="M42 95 C42 110, 83 110, 83 95" fill="none" stroke="#2980b9" stroke-width="3" stroke-dasharray="4" />
+  <polygon points="83,95 77,89 89,89" fill="#2980b9" />
+  
+  <!-- Struktursymbol -->
+  <rect x="88" y="12" width="28" height="28" rx="14" fill="#3498db" />
+  <line x1="94" y1="20" x2="110" y2="20" stroke="white" stroke-width="2" />
+  <line x1="94" y1="26" x2="110" y2="26" stroke="white" stroke-width="2" />
+  <line x1="94" y1="32" x2="110" y2="32" stroke="white" stroke-width="2" />
+</svg>
