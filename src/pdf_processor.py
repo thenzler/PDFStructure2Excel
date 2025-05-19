@@ -54,7 +54,7 @@ class PDFProcessWorker(QThread):
                 text = self._remove_headers(text)
                 
             if rules.get('merge_lines', True):
-                text = self._merge_related_lines(text)
+                text = self._merge_related_lines(text, rules)
             
             # Extrahiere strukturierte Daten
             data = self._extract_structure(text, rules)
@@ -78,13 +78,27 @@ class PDFProcessWorker(QThread):
         
         return '\n'.join(filtered_lines)
     
-    def _merge_related_lines(self, text):
-        """Führt zusammengehörige Zeilen zusammen"""
-        # Vereinfachte Version - kann je nach Dokument angepasst werden
-        # Verbindet Zeilen, wenn eine Zeile nicht mit einem strukturierten Element beginnt
+    def _merge_related_lines(self, text, rules):
+        """
+        Führt zusammengehörige Zeilen zusammen
+        
+        Args:
+            text (str): Zu verarbeitender Text
+            rules (dict): Strukturregeln mit regulären Ausdrücken
+            
+        Returns:
+            str: Text mit zusammengeführten Zeilen
+        """
         result = []
         lines = text.split('\n')
         i = 0
+        
+        # Verwende das Strukturmuster aus den Regeln als Erkennungsmerklmal für neue Einträge
+        level_pattern = rules.get('level_pattern', r'^\s*(\d+)')
+        symbol_pattern = rules.get('symbol_pattern', r'^\s*(?:\d+\s+)?([A-Z](?:\d+(?:\.\d+)*)?)')
+        
+        # Kombiniertes Muster zur Erkennung neuer Strukturelemente
+        structure_pattern = f"({level_pattern}.*?{symbol_pattern})"
         
         while i < len(lines):
             if not lines[i].strip():
@@ -94,9 +108,9 @@ class PDFProcessWorker(QThread):
             current_line = lines[i]
             i += 1
             
-            # Wenn die nächste Zeile nicht mit einer Nummer oder einem Symbol beginnt,
-            # könnte sie zur aktuellen Zeile gehören
-            while i < len(lines) and lines[i].strip() and not re.match(r'^\s*(\d+\s+[A-Z]|\d+\s+qualité|\s*[A-Z]\d+)', lines[i]):
+            # Wenn die nächste Zeile nicht mit einem Strukturelement beginnt,
+            # füge sie zur aktuellen Zeile hinzu
+            while i < len(lines) and lines[i].strip() and not re.search(structure_pattern, lines[i]):
                 current_line += " " + lines[i].strip()
                 i += 1
                 
@@ -105,22 +119,35 @@ class PDFProcessWorker(QThread):
         return '\n'.join(result)
     
     def _extract_structure(self, text, rules):
-        """Extrahiert strukturierte Daten aus dem Text basierend auf den Regeln"""
+        """
+        Extrahiert strukturierte Daten aus dem Text basierend auf den Regeln
+        
+        Args:
+            text (str): Zu analysierender Text
+            rules (dict): Strukturregeln
+            
+        Returns:
+            list: Liste von Dictionaries mit den strukturierten Daten (Level, Symbol, Type, Title_de, Text_de)
+        """
         result = []
         lines = text.split('\n')
+        
+        # Fortschritt initialisieren
+        total_lines = max(1, len(lines))
         
         for i, line in enumerate(lines):
             if not line.strip():
                 continue
                 
-            self.progress_signal.emit(50 + int((i + 1) / len(lines) * 50))
+            # Fortschritt aktualisieren
+            self.progress_signal.emit(50 + int((i + 1) / total_lines * 50))
             
             # Spezielle Behandlung für die erste Zeile mit "qualité palliative"
             if "qualité palliative" in line:
                 result.append({
                     "Level": "1",
-                    "Symbol": "qualité palliative SLZP:25",
-                    "Type": "25",
+                    "Symbol": "Q",  # Besser erkennbares Symbol
+                    "Type": "CHAPTER",
                     "Title_de": "qualité palliative SLZP:25",
                     "Text_de": "Auditkriterien stationäre Langzeitpflege mit allgemeiner Palliative Care"
                 })
@@ -135,15 +162,16 @@ class PDFProcessWorker(QThread):
             
             if level_match and symbol_match:
                 # Extrahiere Symbol und bestimme den Typ
+                level = level_match.group(1)
                 symbol = symbol_match.group(1)
-                type_value = self._determine_type(symbol, rules)
+                type_value = self._determine_type(symbol, level, rules)
                 
                 # Extrahiere Titel und Text
                 rest_of_line = line[max(level_match.end(), symbol_match.end()):].strip()
                 title, text = self._extract_title_and_text(rest_of_line, rules)
                 
                 result.append({
-                    "Level": level_match.group(1),
+                    "Level": level,
                     "Symbol": symbol,
                     "Type": type_value,
                     "Title_de": title,
@@ -152,54 +180,81 @@ class PDFProcessWorker(QThread):
         
         return result
     
-    def _determine_type(self, symbol, rules):
-        """Bestimmt den Typ basierend auf dem Symbol und den Regeln"""
-        # Für Palliative Care
-        if self.structure_type == 'palliative_care':
-            # Vorbestimmte Typen basierend auf der bekannten Struktur
-            if len(symbol) == 1:  # z.B. "A", "B", "C"
-                return "CHAPTER"
-                
-            if "." in symbol:  # z.B. "A1.1", "B2.3"
-                return "REQUIREMENT"
-                
-            # Für Symbole wie A1, B2, etc.
-            if any(c.isdigit() for c in symbol):
-                if len(symbol) == 2:  # z.B. "A1"
-                    return "CHAPTER"
-                return "REQUIREMENT"
-                
-            return "CHAPTER"
+    def _determine_type(self, symbol, level, rules):
+        """
+        Bestimmt den Typ basierend auf dem Symbol, Level und den Regeln
         
-        # Für andere Strukturtypen können hier spezifische Regeln hinzugefügt werden
+        Args:
+            symbol (str): Symbol des Elements (A, B1, C2.1, ...)
+            level (str): Level des Elements (1, 2, 3, ...)
+            rules (dict): Strukturregeln
+            
+        Returns:
+            str: Typ des Elements (CHAPTER, REQUIREMENT, ...)
+        """
+        # Type-Mapping aus den Regeln
         type_mapping = rules.get('type_mapping', {})
         
-        # Basierend auf Symbolmuster bestimmen
-        if len(symbol) == 1 and symbol.isalpha():
+        # Prüfe auf bekannte Muster
+        if len(symbol) == 1 and symbol.isalpha():  # Einzelner Buchstabe (A, B, C)
             return type_mapping.get('single_letter', 'CHAPTER')
             
-        if re.match(r'^[A-Z]\d+$', symbol):
+        if re.match(r'^[A-Z]\d+$', symbol):  # Buchstabe + Zahl (A1, B2)
             return type_mapping.get('letter_number', 'CHAPTER')
             
-        if re.match(r'^[A-Z]\d+\.\d+$', symbol):
+        if re.match(r'^[A-Z]\d+\.\d+$', symbol):  # Buchstabe + Zahl + Punkt + Zahl (A1.1, B2.3)
             return type_mapping.get('letter_number_dot_number', 'REQUIREMENT')
             
-        # Fallback
-        return "REQUIREMENT"
+        if symbol.isdigit():  # Reine Zahl (1, 2, 3)
+            return type_mapping.get('single_number', 'CHAPTER')
+            
+        if re.match(r'^\d+\.\d+$', symbol):  # Zahl + Punkt + Zahl (1.1, 2.3)
+            return type_mapping.get('number_dot_number', 'REQUIREMENT')
+        
+        # Basierend auf Level entscheiden
+        if int(level) <= 2:  # Annahme: Niedriges Level = Kapitel
+            return 'CHAPTER'
+        else:
+            return 'REQUIREMENT'
     
     def _extract_title_and_text(self, content, rules):
-        """Extrahiert Titel und Text aus dem Inhalt"""
+        """
+        Extrahiert Titel und Text aus dem Inhalt
+        
+        Args:
+            content (str): Inhalt nach Entfernung von Level und Symbol
+            rules (dict): Strukturregeln
+            
+        Returns:
+            tuple: (title, text) Titel und Text des Elements
+        """
+        # Verwende Muster aus den Regeln, falls vorhanden
+        title_pattern = rules.get('title_pattern')
+        text_pattern = rules.get('text_pattern')
+        
+        # Verwende Doppelpunkt als Standardtrenner
         if ":" in content:
             parts = content.split(":", 1)
             return parts[0].strip(), parts[1].strip()
         
+        # Versuche, die Muster anzuwenden, falls vorhanden
+        if title_pattern and text_pattern:
+            title_match = re.search(title_pattern, content)
+            text_match = re.search(text_pattern, content)
+            
+            if title_match and text_match:
+                return title_match.group(1).strip(), text_match.group(1).strip()
+        
         # Fallback: Heuristik basierend auf Wortanzahl
         words = content.split()
+        
+        # Wenn wenige Wörter, wahrscheinlich ein Titel ohne Text
         if len(words) <= 5:
             return content, ""
         
-        # Verwende die ersten paar Wörter als Titel
-        title = " ".join(words[:5])
-        text = " ".join(words[5:])
+        # Andernfalls: Ersten paar Wörter als Titel, Rest als Text
+        title_word_count = min(5, len(words) // 3 + 2)  # Dynamisch basierend auf Gesamtwortanzahl
+        title = " ".join(words[:title_word_count])
+        text = " ".join(words[title_word_count:])
         
         return title, text
